@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EC Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+:root {
+  --bg:       #080c12;
+  --surface:  #0f1520;
+  --surface2: #141c2b;
+  --surface3: #1a2236;
+  --border:   #1e2d42;
+  --border2:  #263548;
+  --accent:   #00e5c3;
+  --accent2:  #f7b731;
+  --accent3:  #e05c5c;
+  --blue:     #5b8cf7;
+  --purple:   #a78bfa;
+  --text:     #dce8f5;
+  --muted:    #4a5d73;
+  --muted2:   #7a8fa8;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+}
+
+/* ── DROP SCREEN ─────────────────────────────────────── */
+#drop-screen {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 100vh; gap: 32px; padding: 40px;
+}
+
+#drop-screen .logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 4px; text-transform: uppercase;
+  color: var(--muted2);
+}
+
+#drop-screen h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: 36px; font-weight: 800;
+  color: var(--accent); letter-spacing: -1px; margin-top: -8px;
+}
+
+#drop-zone {
+  width: 400px; max-width: 100%;
+  border: 2px dashed var(--border2);
+  border-radius: 16px; padding: 56px 32px;
+  text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s;
+  position: relative; overflow: hidden;
+}
+#drop-zone::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0,229,195,.04) 0%, transparent 70%);
+  opacity: 0; transition: opacity .2s;
+}
+#drop-zone:hover::before, #drop-zone.drag-over::before { opacity: 1; }
+#drop-zone:hover, #drop-zone.drag-over { border-color: var(--accent); }
+
+.drop-icon { font-size: 48px; margin-bottom: 18px; display: block; }
+.drop-label {
+  font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+  color: var(--text); margin-bottom: 8px;
+}
+.drop-sub { font-size: 11px; color: var(--muted); letter-spacing: .5px; }
+
+#file-input { display: none; }
+#loading-msg { display:none; font-size:12px; color:var(--muted2); letter-spacing:1px; }
+#load-error {
+  display:none; background:rgba(224,92,92,.1); border:1px solid var(--accent3);
+  color:var(--accent3); font-size:12px; padding:10px 18px; border-radius:6px;
+  max-width:400px; text-align:center;
+}
+
+/* ── LAYOUT ──────────────────────────────────────────── */
+#dashboard { display:none; height:100vh; flex-direction:column; }
+
+/* Header */
+.hdr {
+  padding: 0 24px;
+  height: 56px;
+  display: flex; align-items: center; gap: 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.hdr-logo { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; color:var(--accent); }
+.hdr-sub  { font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-top:2px; }
+.hdr-badge {
+  font-size:11px; color:var(--muted2); background:var(--surface2);
+  border:1px solid var(--border); padding:3px 10px; border-radius:4px;
+  max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.hdr-btn {
+  background:var(--surface2); border:1px solid var(--border);
+  color:var(--muted2); font-family:'DM Mono',monospace; font-size:11px;
+  padding:5px 12px; border-radius:4px; cursor:pointer; transition:all .15s;
+}
+.hdr-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Body split: sidebar + main */
+.body-wrap { display:flex; flex:1; overflow:hidden; }
+
+/* ── SIDEBAR ─────────────────────────────────────────── */
+.sidebar {
+  width: 220px; flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+
+.sb-section { padding: 16px 16px 8px; border-bottom: 1px solid var(--border); }
+.sb-label {
+  font-size: 9px; color: var(--muted); letter-spacing: 2px;
+  text-transform: uppercase; margin-bottom: 10px;
+}
+
+/* Time filter pills */
+.time-pills { display:flex; flex-direction:column; gap:3px; }
+.pill {
+  padding: 8px 12px; border-radius: 6px; font-size: 12px;
+  color: var(--muted2); cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid transparent; background: none;
+  font-family: 'DM Mono', monospace; text-align: left; width: 100%;
+}
+.pill:hover { background: var(--surface2); color: var(--text); }
+.pill.active {
+  background: rgba(0,229,195,.08); border-color: rgba(0,229,195,.25);
+  color: var(--accent);
+}
+.pill-count {
+  font-size: 10px; color: var(--muted); background: var(--surface2);
+  padding: 1px 6px; border-radius: 10px; font-family: 'DM Mono', monospace;
+}
+.pill.active .pill-count { background: rgba(0,229,195,.15); color: var(--accent); }
+
+/* Week sub-pills (only shown when month selected) */
+#week-section { display:none; }
+.week-pills { display:flex; flex-direction:column; gap:2px; }
+.week-pill {
+  padding: 6px 12px; border-radius: 5px; font-size: 11px;
+  color: var(--muted); cursor: pointer; transition: all .12s;
+  background: none; border: 1px solid transparent;
+  font-family: 'DM Mono', monospace; text-align: left; width: 100%;
+}
+.week-pill:hover { background: var(--surface2); color: var(--muted2); }
+.week-pill.active {
+  background: rgba(91,140,247,.08); border-color: rgba(91,140,247,.25);
+  color: var(--blue);
+}
+
+/* Date range */
+.date-inputs { display:flex; flex-direction:column; gap:6px; }
+.date-label { font-size:10px; color:var(--muted); margin-bottom:2px; }
+.date-input {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); font-family: 'DM Mono', monospace; font-size:11px;
+  padding: 6px 8px; border-radius:4px; outline:none; width:100%;
+}
+.date-input:focus { border-color: var(--accent); }
+.date-apply {
+  margin-top:4px; padding:7px; width:100%; background:rgba(0,229,195,.1);
+  border:1px solid rgba(0,229,195,.3); color:var(--accent);
+  font-family:'DM Mono',monospace; font-size:11px; border-radius:4px;
+  cursor:pointer; transition:all .15s; letter-spacing:.5px;
+}
+.date-apply:hover { background:rgba(0,229,195,.18); }
+
+.sb-stats { padding:14px 16px; display:flex; flex-direction:column; gap:8px; margin-top:auto; }
+.sb-stat-row { display:flex; justify-content:space-between; align-items:center; }
+.sb-stat-key { font-size:10px; color:var(--muted); }
+.sb-stat-val { font-size:12px; color:var(--text); font-weight:500; }
+
+/* ── MAIN CONTENT ────────────────────────────────────── */
+.main {
+  flex: 1; overflow-y: auto;
+  padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+
+/* Summary cards */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px 18px;
+  border-top: 2px solid var(--border);
+}
+.card.c-teal   { border-top-color: var(--accent); }
+.card.c-yellow { border-top-color: var(--accent2); }
+.card.c-red    { border-top-color: var(--accent3); }
+.card.c-blue   { border-top-color: var(--blue); }
+.card.c-purple { border-top-color: var(--purple); }
+.card-label { font-size:9px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+.card-val {
+  font-family:'Syne',sans-serif; font-size:26px; font-weight:700; color:var(--text); line-height:1;
+}
+.card-val em { font-family:'DM Mono',monospace; font-size:12px; font-weight:400; color:var(--muted2); margin-left:3px; font-style:normal; }
+.card-sub { margin-top:5px; font-size:10px; color:var(--muted); }
+
+/* Charts */
+.chart-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.chart-grid-3 { display:grid; grid-template-columns:2fr 1fr; gap:14px; }
+.chart-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px 18px;
+}
+.chart-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.chart-title { font-size:10px; color:var(--muted2); letter-spacing:1px; text-transform:uppercase; }
+.chart-badge {
+  font-size:10px; padding:2px 8px; border-radius:10px;
+  background:var(--surface2); color:var(--muted2); border:1px solid var(--border);
+}
+canvas { display:block; width:100%!important; }
+
+/* View toggle for main chart */
+.toggle-btns { display:flex; gap:4px; }
+.toggle-btn {
+  padding: 3px 10px; border-radius: 4px; font-size:10px;
+  font-family:'DM Mono',monospace; cursor:pointer; transition:all .12s;
+  background: var(--surface2); border: 1px solid var(--border); color:var(--muted);
+}
+.toggle-btn.active { background:rgba(0,229,195,.1); border-color:rgba(0,229,195,.3); color:var(--accent); }
+
+/* Efficiency scatter hint */
+.scatter-legend { display:flex; gap:12px; margin-top:10px; }
+.leg-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); }
+.leg-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* Table */
+.table-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow:hidden;
+}
+.table-hdr {
+  display:flex; align-items:center; gap:10px; padding:12px 18px;
+  border-bottom:1px solid var(--border); flex-wrap:wrap;
+}
+.table-title { font-size:10px; color:var(--muted2); letter-spacing:1px; text-transform:uppercase; }
+.search-box {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  font-family:'DM Mono',monospace; font-size:11px; padding:5px 10px;
+  border-radius:4px; outline:none; width:160px; margin-left:auto;
+}
+.search-box:focus { border-color:var(--accent); }
+.search-box::placeholder { color:var(--muted); }
+
+.data-table { width:100%; border-collapse:collapse; font-size:12px; }
+.data-table th {
+  padding:9px 14px; text-align:left; font-size:9px; color:var(--muted);
+  letter-spacing:1px; text-transform:uppercase; background:var(--surface2);
+  border-bottom:1px solid var(--border); cursor:pointer; user-select:none;
+  white-space:nowrap;
+}
+.data-table th:hover { color:var(--text); }
+.data-table th.sort-asc::after  { content:' ↑'; color:var(--accent); }
+.data-table th.sort-desc::after { content:' ↓'; color:var(--accent); }
+.data-table td {
+  padding:8px 14px; border-bottom:1px solid var(--border);
+  color:var(--muted2); white-space:nowrap;
+}
+.data-table tr:last-child td { border-bottom:none; }
+.data-table tr:hover td { background:var(--surface2); }
+.data-table td.hi { color:var(--text); }
+.val-acc { color:var(--accent); }
+
+.bar-cell { display:flex; align-items:center; gap:8px; }
+.bar-mini { height:3px; border-radius:2px; background:var(--accent); flex-shrink:0; opacity:.6; }
+
+.badge { display:inline-block; padding:2px 7px; border-radius:3px; font-size:10px; letter-spacing:.3px; }
+.bg { background:rgba(0,229,195,.12); color:var(--accent); }
+.bk { background:rgba(247,183,49,.12); color:var(--accent2); }
+.br { background:rgba(224,92,92,.12);  color:var(--accent3); }
+.bm { background:rgba(91,140,247,.12); color:var(--blue); }
+
+.pagination {
+  display:flex; align-items:center; gap:8px; padding:12px 18px;
+  border-top:1px solid var(--border); font-size:11px;
+}
+.pg-btn {
+  background:var(--surface2); border:1px solid var(--border); color:var(--muted2);
+  font-family:'DM Mono',monospace; font-size:11px; padding:4px 10px; border-radius:3px;
+  cursor:pointer; transition:all .1s;
+}
+.pg-btn:hover { border-color:var(--accent); color:var(--accent); }
+.pg-btn:disabled { opacity:.3; cursor:not-allowed; }
+.pg-info { color:var(--muted2); }
+.no-data { padding:40px; text-align:center; color:var(--muted); font-size:12px; }
+
+/* ── Responsive ──────────────────────────────────────── */
+@media(max-width:1100px) { .summary-grid { grid-template-columns:repeat(3,1fr); } }
+@media(max-width:800px)  {
+  .sidebar { width:180px; }
+  .summary-grid { grid-template-columns:repeat(2,1fr); }
+  .chart-grid-2, .chart-grid-3 { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- DROP SCREEN -->
+<div id="drop-screen">
+  <div style="text-align:center">
+    <div class="logo">EV Energy Tracker</div>
+    <h1>⚡ EC Dashboard</h1>
+  </div>
+  <div id="drop-zone" onclick="fileInput.click()">
+    <span class="drop-icon">🗄️</span>
+    <div class="drop-label">Drop your .db file here</div>
+    <div class="drop-sub">or click to browse · SQLite databases</div>
+  </div>
+  <input type="file" id="file-input" accept=".db,.sqlite,.sqlite3">
+  <p style="font-size:12px;color:var(--muted);text-align:center;max-width:360px;line-height:1.8">
+    Expects an <strong style="color:var(--text)">EnergyConsumption</strong> table with<br>
+    <code style="color:var(--accent2);font-size:11px">start_timestamp · duration · trip · electricity</code>
+  </p>
+  <div id="loading-msg">⏳ &nbsp;Loading database…</div>
+  <div id="load-error"></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div>
+      <div class="hdr-logo">⚡ EC Dashboard</div>
+    </div>
+    <div id="db-badge" class="hdr-badge">—</div>
+    <div id="range-badge" style="font-size:11px;color:var(--muted2)">—</div>
+    <button class="hdr-btn" style="margin-left:auto" onclick="resetToDropScreen()">↩ Load file</button>
+  </div>
+
+  <div class="body-wrap">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <div class="sb-section">
+        <div class="sb-label">Time Period</div>
+        <div class="time-pills" id="month-pills"></div>
+      </div>
+
+      <div class="sb-section" id="week-section">
+        <div class="sb-label">Week</div>
+        <div class="week-pills" id="week-pills"></div>
+      </div>
+
+      <div class="sb-section">
+        <div class="sb-label">Efficiency Filter <span style="color:var(--muted);font-size:9px">kWh/km</span></div>
+        <div class="date-inputs">
+          <div style="display:flex;gap:6px">
+            <div style="flex:1">
+              <div class="date-label">Min</div>
+              <input type="number" id="eff-min" class="date-input" step="0.01" min="0" max="1" placeholder="0.090" value="0.090">
+            </div>
+            <div style="flex:1">
+              <div class="date-label">Max</div>
+              <input type="number" id="eff-max" class="date-input" step="0.01" min="0" max="2" placeholder="0.40" value="0.40">
+            </div>
+          </div>
+          <button class="date-apply" onclick="applyEffFilter()">Apply</button>
+          <button class="date-apply" style="background:none;border-color:var(--border2);color:var(--muted2)" onclick="clearEffFilter()">Clear</button>
+          <div id="eff-filter-badge" style="display:none;font-size:10px;color:var(--accent2);background:rgba(247,183,49,.08);border:1px solid rgba(247,183,49,.2);padding:4px 8px;border-radius:4px;margin-top:4px"></div>
+        </div>
+      </div>
+
+      <div class="sb-section">
+        <div class="sb-label">Date Range</div>
+        <div class="date-inputs">
+          <div>
+            <div class="date-label">From</div>
+            <input type="date" id="date-from" class="date-input">
+          </div>
+          <div>
+            <div class="date-label">To</div>
+            <input type="date" id="date-to" class="date-input">
+          </div>
+          <button class="date-apply" onclick="applyDateRange()">Apply Range</button>
+          <button class="date-apply" style="background:none;border-color:var(--border2);color:var(--muted2)" onclick="clearDateRange()">Clear</button>
+        </div>
+      </div>
+
+      <div class="sb-stats">
+        <div class="sb-label">Selection</div>
+        <div class="sb-stat-row">
+          <span class="sb-stat-key">Trips</span>
+          <span class="sb-stat-val" id="sb-trips">—</span>
+        </div>
+        <div class="sb-stat-row">
+          <span class="sb-stat-key">Total km</span>
+          <span class="sb-stat-val" id="sb-km">—</span>
+        </div>
+        <div class="sb-stat-row">
+          <span class="sb-stat-key">Total kWh</span>
+          <span class="sb-stat-val" id="sb-kwh">—</span>
+        </div>
+        <div class="sb-stat-row">
+          <span class="sb-stat-key">Best eff.</span>
+          <span class="sb-stat-val" id="sb-best">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main" id="main-content">
+
+      <!-- Summary cards -->
+      <div class="summary-grid">
+        <div class="card c-teal">
+          <div class="card-label">Total Distance</div>
+          <div class="card-val" id="s-dist">—<em>km</em></div>
+          <div class="card-sub" id="s-dist-sub"></div>
+        </div>
+        <div class="card c-yellow">
+          <div class="card-label">Energy Used</div>
+          <div class="card-val" id="s-elec">—<em>kWh</em></div>
+          <div class="card-sub" id="s-elec-sub"></div>
+        </div>
+        <div class="card c-blue">
+          <div class="card-label">Drive Time</div>
+          <div class="card-val" id="s-time">—<em>h</em></div>
+          <div class="card-sub" id="s-time-sub"></div>
+        </div>
+        <div class="card c-red">
+          <div class="card-label">Avg Efficiency</div>
+          <div class="card-val" id="s-eff">—<em>kWh/km</em></div>
+          <div class="card-sub" id="s-eff-sub"></div>
+        </div>
+        <div class="card c-purple">
+          <div class="card-label">Avg Speed</div>
+          <div class="card-val" id="s-spd">—<em>km/h</em></div>
+          <div class="card-sub" id="s-spd-sub"></div>
+        </div>
+      </div>
+
+      <!-- Main timeline chart -->
+      <div class="chart-card">
+        <div class="chart-hdr">
+          <span class="chart-title" id="timeline-title">Distance &amp; Energy over Time</span>
+          <div class="toggle-btns">
+            <button class="toggle-btn active" id="tb-daily"   onclick="setGranularity('daily')">Daily</button>
+            <button class="toggle-btn"        id="tb-weekly"  onclick="setGranularity('weekly')">Weekly</button>
+            <button class="toggle-btn"        id="tb-monthly" onclick="setGranularity('monthly')">Monthly</button>
+          </div>
+        </div>
+        <canvas id="chart-timeline" height="140"></canvas>
+      </div>
+
+      <!-- Lower row: efficiency over time + speed dist -->
+      <div class="chart-grid-2">
+        <div class="chart-card">
+          <div class="chart-hdr">
+            <span class="chart-title">Efficiency per Trip (kWh/km)</span>
+            <span class="chart-badge" id="eff-avg-badge">avg —</span>
+          </div>
+          <canvas id="chart-eff" height="160"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-hdr">
+            <span class="chart-title">Trip Distance Distribution</span>
+            <span class="chart-badge" id="dist-median-badge">median —</span>
+          </div>
+          <canvas id="chart-dist-hist" height="160"></canvas>
+        </div>
+      </div>
+
+      <!-- Trip log table -->
+      <div class="table-card">
+        <div class="table-hdr">
+          <span class="table-title">Trip Log</span>
+          <input class="search-box" id="search" placeholder="Search…" oninput="page=1;renderTable()">
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th onclick="sortBy('id')"           id="th-id">#</th>
+                <th onclick="sortBy('date_num')"      id="th-date_num">Date</th>
+                <th onclick="sortBy('start_timestamp')" id="th-start_timestamp">Start</th>
+                <th onclick="sortBy('duration')"      id="th-duration">Duration</th>
+                <th onclick="sortBy('trip')"          id="th-trip">Distance</th>
+                <th onclick="sortBy('electricity')"   id="th-electricity">Energy</th>
+                <th onclick="sortBy('efficiency')"    id="th-efficiency">Efficiency</th>
+                <th onclick="sortBy('avg_speed_kmh')" id="th-avg_speed_kmh">Avg Speed</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /body-wrap -->
+</div><!-- /dashboard -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────
+let DATA = [];
+let filtMode = 'ALL'; // 'ALL' | 'month:YYYYMM' | 'week:YYYYWW' | 'range'
+let granularity = 'daily'; // 'daily' | 'weekly' | 'monthly'
+let sortField = 'start_timestamp', sortDir = 1;
+let page = 1;
+const PAGE_SIZE = 25;
+let charts = {};
+let SQL = null;
+let dateFrom = null, dateTo = null;
+let effMin = 0.090, effMax = 0.40;
+
+const MONTH_NAMES = {
+  '01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+  '07':'Jul','08':'Aug','09':'Oct','10':'Oct','11':'Nov','12':'Dec'
+};
+const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}` })
+  .then(s => { SQL = s; })
+  .catch(() => showError('Failed to load SQLite engine.'));
+
+// ── Drop zone ─────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if(e.target.files[0]) loadFile(e.target.files[0]); });
+
+function showError(msg) {
+  const el = document.getElementById('load-error');
+  el.textContent = '⚠ ' + msg; el.style.display = 'block';
+  document.getElementById('loading-msg').style.display = 'none';
+}
+
+function loadFile(file) {
+  if (!SQL) { showError('SQLite engine not ready yet.'); return; }
+  document.getElementById('load-error').style.display = 'none';
+  document.getElementById('loading-msg').style.display = 'block';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const db = new SQL.Database(new Uint8Array(e.target.result));
+      const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+      const allTables = tables[0].values.map(v => v[0]);
+      const ecTable = allTables.find(t => t.toLowerCase() === 'energyconsumption');
+      if (!ecTable) throw new Error(`No EnergyConsumption table. Found: ${allTables.join(', ')}`);
+
+      const res = db.exec(`SELECT * FROM ${ecTable} WHERE (is_deleted IS NULL OR is_deleted = 0) AND trip >= 0.5 ORDER BY start_timestamp`);
+      db.close();
+      if (!res.length || !res[0].values.length) throw new Error('Table is empty.');
+
+      const rawCols = res[0].columns.map(c => c.toLowerCase());
+      DATA = res[0].values.map(v => {
+        const r = {}; rawCols.forEach((c,i) => r[c] = v[i]);
+        const trip  = parseFloat(r['trip']) || 0;
+        const elec  = parseFloat(r['electricity']) || 0;
+        const dur   = r['duration'] || 0;
+        const ts    = r['start_timestamp'] || 0;
+        const d     = new Date(ts * 1000);
+        const dateNum = r['date'] ? parseInt(r['date']) : (
+          d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()
+        );
+        return {
+          id:              r['_id'] ?? r['id'] ?? 0,
+          month:           r['month'] ?? '',
+          date_num:        dateNum,
+          start_timestamp: ts,
+          end_timestamp:   r['end_timestamp'] ?? 0,
+          duration:        dur,
+          trip,
+          electricity:     elec,
+          fuel:            parseFloat(r['fuel']) || 0,
+          efficiency:      (trip > 0.5 && elec > 0) ? elec / trip : null,
+          avg_speed_kmh:   (dur > 30 && trip > 0) ? trip / (dur / 3600) : null,
+        };
+      });
+
+      document.getElementById('db-badge').textContent = file.name;
+      document.getElementById('loading-msg').style.display = 'none';
+      document.getElementById('drop-screen').style.display = 'none';
+      const dash = document.getElementById('dashboard');
+      dash.style.display = 'flex';
+
+      filtMode = 'ALL';
+      granularity = 'daily';
+      page = 1;
+      buildSidebar();
+      update();
+    } catch(err) { showError(err.message); }
+  };
+  reader.onerror = () => showError('Failed to read file.');
+  reader.readAsArrayBuffer(file);
+}
+
+function resetToDropScreen() {
+  DATA = [];
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('drop-screen').style.display = 'flex';
+  document.getElementById('load-error').style.display = 'none';
+  fileInput.value = '';
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+}
+
+// ── Date helpers ──────────────────────────────────────────────────
+function dateNumToDate(n) {
+  const s = String(n);
+  return new Date(parseInt(s.slice(0,4)), parseInt(s.slice(4,6))-1, parseInt(s.slice(6,8)));
+}
+
+function isoToDateNum(iso) {
+  return parseInt(iso.replace(/-/g,''));
+}
+
+function fmtDate(n) {
+  const s = String(n);
+  return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+}
+
+function fmtTime(ts) {
+  return new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtDuration(secs) {
+  if (secs >= 3600) return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`;
+  if (secs >= 60)   return `${Math.floor(secs/60)}m`;
+  return `${secs}s`;
+}
+
+// ISO week number
+function isoWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return [d.getUTCFullYear(), Math.ceil((((d - yearStart)/86400000)+1)/7)];
+}
+
+function weekKey(date) {
+  const [yr, wk] = isoWeek(date);
+  return `${yr}W${String(wk).padStart(2,'0')}`;
+}
+
+function weekLabel(key) {
+  // key = "2026W14" — find Monday of that week
+  const yr = parseInt(key.slice(0,4));
+  const wk = parseInt(key.slice(5));
+  const jan4 = new Date(yr, 0, 4);
+  const monday = new Date(jan4.getTime() + ((1 - (jan4.getDay()||7)) + (wk-1)*7)*86400000);
+  const sunday = new Date(monday.getTime() + 6*86400000);
+  const fmt = d => `${d.getDate()} ${MN[d.getMonth()]}`;
+  return `${fmt(monday)} – ${fmt(sunday)}`;
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────
+function buildSidebar() {
+  const months = [...new Set(DATA.map(r => r.month))].filter(Boolean).sort();
+  const container = document.getElementById('month-pills');
+  container.innerHTML = '';
+
+  // All Time
+  const allCount = DATA.length;
+  container.innerHTML = `<button class="pill active" data-month="ALL" onclick="selectMonth('ALL')">
+    All Time <span class="pill-count">${allCount}</span></button>`;
+
+  months.forEach(m => {
+    const count = DATA.filter(r => r.month === m).length;
+    const yr = m.slice(0,4), mo = m.slice(4,6);
+    const label = (MN[parseInt(mo)-1] || mo) + ' ' + yr;
+    const btn = document.createElement('button');
+    btn.className = 'pill';
+    btn.dataset.month = m;
+    btn.innerHTML = `${label} <span class="pill-count">${count}</span>`;
+    btn.onclick = () => selectMonth(m);
+    container.appendChild(btn);
+  });
+}
+
+function selectMonth(m) {
+  filtMode = m === 'ALL' ? 'ALL' : `month:${m}`;
+  dateFrom = dateTo = null;
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value = '';
+  page = 1;
+
+  // Rebuild week pills if a month selected
+  const weekSec = document.getElementById('week-section');
+  if (m !== 'ALL') {
+    const monthData = DATA.filter(r => r.month === m);
+    const weeks = [...new Set(monthData.map(r => weekKey(dateNumToDate(r.date_num))))].sort();
+    if (weeks.length > 1) {
+      weekSec.style.display = 'block';
+      const wp = document.getElementById('week-pills');
+      wp.innerHTML = `<button class="week-pill active" data-week="ALL" onclick="selectWeek('ALL','${m}')">All weeks</button>`;
+      weeks.forEach(wk => {
+        const cnt = monthData.filter(r => weekKey(dateNumToDate(r.date_num)) === wk).length;
+        const btn = document.createElement('button');
+        btn.className = 'week-pill';
+        btn.dataset.week = wk;
+        btn.innerHTML = `<span style="font-size:9px;color:var(--muted);display:block">${wk}</span>${weekLabel(wk)} <span style="font-size:9px;color:var(--muted);margin-left:4px">${cnt}</span>`;
+        btn.onclick = () => selectWeek(wk, m);
+        wp.appendChild(btn);
+      });
+    } else {
+      weekSec.style.display = 'none';
+    }
+  } else {
+    weekSec.style.display = 'none';
+  }
+
+  document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.month === m));
+  document.querySelectorAll('.week-pill').forEach(p => p.classList.toggle('active', p.dataset.week === 'ALL'));
+  update();
+}
+
+function selectWeek(wk, parentMonth) {
+  if (wk === 'ALL') {
+    filtMode = `month:${parentMonth}`;
+  } else {
+    filtMode = `week:${wk}`;
+  }
+  page = 1;
+  document.querySelectorAll('.week-pill').forEach(p => p.classList.toggle('active', p.dataset.week === wk));
+  update();
+}
+
+function applyDateRange() {
+  const f = document.getElementById('date-from').value;
+  const t = document.getElementById('date-to').value;
+  if (!f && !t) return;
+  dateFrom = f ? isoToDateNum(f) : null;
+  dateTo   = t ? isoToDateNum(t) : null;
+  filtMode = 'range';
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.week-pill').forEach(p => p.classList.remove('active'));
+  document.getElementById('week-section').style.display = 'none';
+  page = 1;
+  update();
+}
+
+function clearDateRange() {
+  dateFrom = dateTo = null;
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value = '';
+  selectMonth('ALL');
+}
+
+// ── Filtered data ─────────────────────────────────────────────────
+function filteredData() {
+  let rows;
+  if (filtMode === 'range') {
+    rows = DATA.filter(r => {
+      if (dateFrom && r.date_num < dateFrom) return false;
+      if (dateTo   && r.date_num > dateTo)   return false;
+      return true;
+    });
+  } else if (filtMode === 'ALL') {
+    rows = DATA;
+  } else if (filtMode.startsWith('month:')) {
+    const m = filtMode.slice(6);
+    rows = DATA.filter(r => r.month === m);
+  } else if (filtMode.startsWith('week:')) {
+    const wk = filtMode.slice(5);
+    rows = DATA.filter(r => weekKey(dateNumToDate(r.date_num)) === wk);
+  } else {
+    rows = DATA;
+  }
+  // Efficiency bounds: trips WITH a valid efficiency must fall within bounds;
+  // trips without a calculable efficiency (short/no-elec) are kept as-is.
+  if (effMin !== null || effMax !== null) {
+    rows = rows.filter(r => {
+      if (r.efficiency === null) return true; // no efficiency calc — keep
+      if (effMin !== null && r.efficiency < effMin) return false;
+      if (effMax !== null && r.efficiency > effMax) return false;
+      return true;
+    });
+  }
+  return rows;
+}
+
+// ── Summary cards ─────────────────────────────────────────────────
+function updateSummary(data) {
+  const totalDist = data.reduce((s,r) => s+r.trip, 0);
+  const totalElec = data.reduce((s,r) => s+r.electricity, 0);
+  const totalSec  = data.filter(r => r.duration < 86400).reduce((s,r) => s+r.duration, 0);
+  const validEff  = data.filter(r => r.trip > 1 && r.electricity > 0);
+  const avgEff    = validEff.length ? validEff.reduce((s,r) => s+r.efficiency, 0)/validEff.length : 0;
+  const validSpd  = data.filter(r => r.avg_speed_kmh !== null && r.avg_speed_kmh < 200);
+  const avgSpd    = validSpd.length ? validSpd.reduce((s,r) => s+r.avg_speed_kmh, 0)/validSpd.length : 0;
+
+  document.getElementById('s-dist').innerHTML = `${totalDist.toFixed(1)}<em>km</em>`;
+  document.getElementById('s-dist-sub').textContent = `${data.length} trips`;
+  document.getElementById('s-elec').innerHTML = `${totalElec.toFixed(1)}<em>kWh</em>`;
+  document.getElementById('s-elec-sub').textContent = totalDist > 0 ? `${(totalElec/totalDist*1000).toFixed(0)} Wh/km avg` : '';
+  document.getElementById('s-time').innerHTML = `${(totalSec/3600).toFixed(1)}<em>h</em>`;
+  document.getElementById('s-time-sub').textContent = fmtDuration(totalSec) + ' total';
+  document.getElementById('s-eff').innerHTML = `${avgEff.toFixed(3)}<em>kWh/km</em>`;
+  document.getElementById('s-eff-sub').textContent = `${validEff.length} qualifying trips`;
+  document.getElementById('s-spd').innerHTML = `${avgSpd.toFixed(1)}<em>km/h</em>`;
+  document.getElementById('s-spd-sub').textContent = `${validSpd.length} trips with speed`;
+
+  // Sidebar mini stats
+  const bestEff = validEff.length ? Math.min(...validEff.map(r => r.efficiency)) : null;
+  document.getElementById('sb-trips').textContent = data.length;
+  document.getElementById('sb-km').textContent = totalDist.toFixed(1);
+  document.getElementById('sb-kwh').textContent = totalElec.toFixed(1);
+  document.getElementById('sb-best').textContent = bestEff ? bestEff.toFixed(3) + ' kWh/km' : '—';
+
+  // Range badge in header
+  if (data.length) {
+    const dates = data.map(r => r.date_num).sort();
+    document.getElementById('range-badge').textContent = `${fmtDate(dates[0])} → ${fmtDate(dates[dates.length-1])}`;
+  } else {
+    document.getElementById('range-badge').textContent = 'No data';
+  }
+}
+
+// ── Timeline chart ────────────────────────────────────────────────
+function setGranularity(g) {
+  granularity = g;
+  ['daily','weekly','monthly'].forEach(x => {
+    document.getElementById('tb-'+x).classList.toggle('active', x === g);
+  });
+  updateCharts(filteredData());
+}
+
+function buildBuckets(data, gran) {
+  const map = {};
+  data.forEach(r => {
+    const d = dateNumToDate(r.date_num);
+    let key, label;
+    if (gran === 'monthly') {
+      key = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}`;
+      label = MN[d.getMonth()] + ' ' + d.getFullYear();
+    } else if (gran === 'weekly') {
+      key = weekKey(d);
+      label = weekLabel(key);
+    } else {
+      key = String(r.date_num);
+      const s = key;
+      label = `${s.slice(6,8)}/${s.slice(4,6)}`;
+    }
+    if (!map[key]) map[key] = { key, label, dist:0, elec:0, trips:0 };
+    map[key].dist  += r.trip;
+    map[key].elec  += r.electricity;
+    map[key].trips += 1;
+  });
+  return Object.values(map).sort((a,b) => a.key.localeCompare(b.key));
+}
+
+function chartDefaults() {
+  return {
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor:'#0f1520', borderColor:'#1e2d42', borderWidth:1,
+        titleColor:'#7a8fa8', bodyColor:'#dce8f5', padding:10,
+      }
+    },
+    scales: {
+      x: { ticks:{ color:'#4a5d73', font:{family:'DM Mono',size:10}, maxRotation:45 }, grid:{ color:'#1e2d42' } },
+      y: { ticks:{ color:'#4a5d73', font:{family:'DM Mono',size:10} },                 grid:{ color:'#1e2d42' } }
+    }
+  };
+}
+
+function destroyChart(id) { if(charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function updateCharts(data) {
+  const buckets = buildBuckets(data, granularity);
+  const labels  = buckets.map(b => b.label);
+
+  // Timeline: dual axis distance + energy
+  destroyChart('timeline');
+  const tlCtx = document.getElementById('chart-timeline').getContext('2d');
+  const titleEl = document.getElementById('timeline-title');
+  titleEl.textContent = granularity.charAt(0).toUpperCase()+granularity.slice(1)+' Distance & Energy';
+  charts['timeline'] = new Chart(tlCtx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Distance (km)', data: buckets.map(b => +b.dist.toFixed(2)),
+          backgroundColor: 'rgba(0,229,195,.25)', borderColor: '#00e5c3',
+          borderWidth: 1, borderRadius: 3, yAxisID: 'y',
+          order: 2,
+        },
+        {
+          label: 'Energy (kWh)', data: buckets.map(b => +b.elec.toFixed(2)),
+          type: 'line', borderColor: '#f7b731', backgroundColor: 'rgba(247,183,49,.12)',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#f7b731',
+          tension: 0.3, fill: true, yAxisID: 'y2',
+          order: 1,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color:'#7a8fa8', font:{family:'DM Mono',size:10}, boxWidth:10, usePointStyle:true }
+        },
+        tooltip: {
+          backgroundColor:'#0f1520', borderColor:'#1e2d42', borderWidth:1,
+          titleColor:'#7a8fa8', bodyColor:'#dce8f5', padding:10,
+        }
+      },
+      scales: {
+        x: { ticks:{ color:'#4a5d73', font:{family:'DM Mono',size:10}, maxRotation:45 }, grid:{ color:'#1e2d42' } },
+        y:  { position:'left',  ticks:{ color:'#00e5c3', font:{family:'DM Mono',size:10} }, grid:{ color:'#1e2d42' } },
+        y2: { position:'right', ticks:{ color:'#f7b731', font:{family:'DM Mono',size:10} }, grid:{ display:false } }
+      }
+    }
+  });
+
+  // Efficiency per trip (line)
+  destroyChart('eff');
+  const effData = data
+    .filter(r => r.efficiency !== null && r.trip > 1)
+    .sort((a,b) => a.start_timestamp - b.start_timestamp);
+  const effLabels = effData.map(r => fmtDate(r.date_num));
+  const effVals   = effData.map(r => +r.efficiency.toFixed(4));
+  const avgEff    = effVals.length ? effVals.reduce((s,v)=>s+v,0)/effVals.length : 0;
+  document.getElementById('eff-avg-badge').textContent = `avg ${avgEff.toFixed(3)} kWh/km`;
+
+  const effColors = effVals.map(v => v < 0.15 ? '#00e5c3' : v < 0.20 ? '#f7b731' : '#e05c5c');
+
+  const effCtx = document.getElementById('chart-eff').getContext('2d');
+  charts['eff'] = new Chart(effCtx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        data: effData.map((r,i) => ({ x: i, y: +r.efficiency.toFixed(4), label: fmtDate(r.date_num), dist: r.trip.toFixed(1) })),
+        pointBackgroundColor: effColors,
+        pointBorderColor: 'transparent',
+        pointRadius: 4, pointHoverRadius: 6,
+      },
+      // avg line
+      {
+        type:'line', data:[{x:0,y:avgEff},{x:effVals.length-1,y:avgEff}],
+        borderColor:'rgba(122,143,168,.4)', borderWidth:1.5, borderDash:[4,4],
+        pointRadius:0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend:{ display:false },
+        tooltip:{
+          backgroundColor:'#0f1520', borderColor:'#1e2d42', borderWidth:1,
+          titleColor:'#7a8fa8', bodyColor:'#dce8f5', padding:10,
+          callbacks:{
+            title: items => items[0].raw.label || '',
+            label: item => ` ${item.raw.y.toFixed(4)} kWh/km  ·  ${item.raw.dist} km`
+          }
+        }
+      },
+      scales:{
+        x:{ display:false },
+        y:{ ticks:{ color:'#4a5d73', font:{family:'DM Mono',size:10} }, grid:{color:'#1e2d42'} }
+      }
+    }
+  });
+
+  // Distance histogram
+  destroyChart('dist-hist');
+  const trips = data.filter(r => r.trip > 0.3).map(r => r.trip);
+  const bins = [0,2,5,10,15,20,30,50,100,200,Infinity];
+  const binLabels = ['<2','2–5','5–10','10–15','15–20','20–30','30–50','50–100','100–200','>200'];
+  const binCounts = Array(bins.length-1).fill(0);
+  trips.forEach(t => { for(let i=0;i<bins.length-1;i++) { if(t>=bins[i]&&t<bins[i+1]){binCounts[i]++;break;} } });
+
+  const sorted = [...trips].sort((a,b)=>a-b);
+  const med = sorted.length ? sorted[Math.floor(sorted.length/2)] : 0;
+  document.getElementById('dist-median-badge').textContent = `median ${med.toFixed(1)} km`;
+
+  const histCtx = document.getElementById('chart-dist-hist').getContext('2d');
+  charts['dist-hist'] = new Chart(histCtx, {
+    type: 'bar',
+    data: {
+      labels: binLabels,
+      datasets:[{
+        data: binCounts,
+        backgroundColor: binCounts.map((_,i) => i===binCounts.indexOf(Math.max(...binCounts)) ? 'rgba(91,140,247,.5)' : 'rgba(91,140,247,.2)'),
+        borderColor: '#5b8cf7', borderWidth:1, borderRadius:3,
+      }]
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#0f1520', borderColor:'#1e2d42', borderWidth:1, titleColor:'#7a8fa8', bodyColor:'#dce8f5', callbacks:{ label: v => ` ${v.raw} trips` } } },
+      scales:{
+        x:{ ticks:{color:'#4a5d73',font:{family:'DM Mono',size:10}}, grid:{color:'#1e2d42'} },
+        y:{ ticks:{color:'#4a5d73',font:{family:'DM Mono',size:10}}, grid:{color:'#1e2d42'} }
+      }
+    }
+  });
+}
+
+// ── Table ─────────────────────────────────────────────────────────
+function sortBy(field) {
+  if (sortField === field) sortDir *= -1;
+  else { sortField = field; sortDir = 1; }
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sort-asc','sort-desc'));
+  const th = document.getElementById('th-'+field);
+  if (th) th.classList.add(sortDir===1?'sort-asc':'sort-desc');
+  page = 1; renderTable();
+}
+
+function getEffBadge(eff) {
+  if (eff === null) return '<span style="color:var(--muted)">—</span>';
+  if (eff < 0.15)  return `<span class="badge bg">${eff.toFixed(3)}</span>`;
+  if (eff < 0.20)  return `<span class="badge bk">${eff.toFixed(3)}</span>`;
+  if (eff < 0.30)  return `<span class="badge br">${eff.toFixed(3)}</span>`;
+  return `<span class="badge bm">${eff.toFixed(3)}</span>`;
+}
+
+function renderTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  let rows = filteredData().filter(r => !q ||
+    fmtDate(r.date_num).includes(q) || String(r.month).includes(q) ||
+    (r.trip.toFixed(1)).includes(q)
+  );
+
+  rows.sort((a,b) => {
+    let av = a[sortField] ?? (sortField==='efficiency'?Infinity:-Infinity);
+    let bv = b[sortField] ?? (sortField==='efficiency'?Infinity:-Infinity);
+    return (av>bv?1:av<bv?-1:0)*sortDir;
+  });
+
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total/PAGE_SIZE));
+  if (page > totalPages) page = 1;
+  const slice = rows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  const maxDist = Math.max(...rows.map(r=>r.trip), 1);
+
+  const tbody = document.getElementById('table-body');
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="no-data">No trips found</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => {
+      const barW = Math.min(56, (r.trip/maxDist)*56);
+      const wk = weekKey(dateNumToDate(r.date_num));
+      return `<tr>
+        <td class="hi" style="color:var(--muted)">${r.id}</td>
+        <td class="hi">${fmtDate(r.date_num)} <span style="font-size:9px;color:var(--muted)">${wk}</span></td>
+        <td>${fmtTime(r.start_timestamp)}</td>
+        <td>${fmtDuration(r.duration)}</td>
+        <td><div class="bar-cell"><div class="bar-mini" style="width:${barW}px"></div><span class="val-acc">${r.trip.toFixed(1)} km</span></div></td>
+        <td>${r.electricity.toFixed(2)} kWh</td>
+        <td>${getEffBadge(r.efficiency)}</td>
+        <td>${r.avg_speed_kmh ? r.avg_speed_kmh.toFixed(1)+' km/h' : '<span style="color:var(--muted)">—</span>'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('pagination').innerHTML = `
+    <button class="pg-btn" onclick="goPage(${page-1})" ${page<=1?'disabled':''}>← Prev</button>
+    <span class="pg-info">Page ${page} / ${totalPages}</span>
+    <button class="pg-btn" onclick="goPage(${page+1})" ${page>=totalPages?'disabled':''}>Next →</button>
+    <span style="margin-left:auto;color:var(--muted)">${total} trips</span>
+  `;
+}
+
+function goPage(p) { page = p; renderTable(); }
+
+
+function applyEffFilter() {
+  const mn = parseFloat(document.getElementById('eff-min').value);
+  const mx = parseFloat(document.getElementById('eff-max').value);
+  effMin = isNaN(mn) ? null : mn;
+  effMax = isNaN(mx) ? null : mx;
+  const badge = document.getElementById('eff-filter-badge');
+  if (effMin !== null || effMax !== null) {
+    badge.style.display = 'block';
+    const lo = effMin !== null ? effMin.toFixed(2) : '—';
+    const hi = effMax !== null ? effMax.toFixed(2) : '—';
+    badge.textContent = `Filtering: ${lo} – ${hi} kWh/km`;
+  } else {
+    badge.style.display = 'none';
+  }
+  page = 1; update();
+}
+
+function clearEffFilter() {
+  effMin = null; effMax = null;
+  document.getElementById('eff-min').value = '';
+  document.getElementById('eff-max').value = '';
+  document.getElementById('eff-filter-badge').style.display = 'none';
+  page = 1; update();
+}
+
+// ── Master update ─────────────────────────────────────────────────
+function update() {
+  const data = filteredData();
+  updateSummary(data);
+  updateCharts(data);
+  renderTable();
+}
+
+Chart.defaults.font.family = 'DM Mono';
+</script>
+</body>
+</html>
